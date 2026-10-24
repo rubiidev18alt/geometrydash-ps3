@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "game.h"
 #include "render.h"
@@ -8,19 +7,26 @@
 #define WIDTH 1280
 #define HEIGHT 720
 
-static const char *mode_name(GameMode mode)
-{
-    switch (mode) {
-    case GAME_TITLE: return "title";
-    case GAME_PLAYING: return "gameplay";
-    case GAME_PAUSED: return "paused";
-    case GAME_CRASHED: return "crashed";
-    case GAME_COMPLETE: return "complete";
-    default: return "preview";
-    }
-}
+typedef struct {
+    const char *name;
+    GameMode mode;
+    float scroll;
+    float player_y;
+    unsigned progress;
+    unsigned frame;
+} Preview;
 
-static int write_preview(GameMode mode, const char *directory)
+static const Preview previews[] = {
+    { "title", GAME_TITLE, 0.0f, 384.0f, 0, 0 },
+    { "gameplay_approach", GAME_PLAYING, 250.0f, 384.0f, 4, 50 },
+    { "gameplay_jump", GAME_PLAYING, 300.0f, 340.0f, 5, 60 },
+    { "gameplay_run", GAME_PLAYING, 1800.0f, 384.0f, 34, 180 },
+    { "paused", GAME_PAUSED, 1800.0f, 384.0f, 34, 180 },
+    { "crashed", GAME_CRASHED, 330.0f, 384.0f, 6, 72 },
+    { "complete", GAME_COMPLETE, 5200.0f, 384.0f, 100, 1000 }
+};
+
+static int write_preview(const Preview *preview, const char *directory)
 {
     uint32_t *framebuffer = malloc((size_t)WIDTH * HEIGHT * sizeof(*framebuffer));
     GameState game;
@@ -31,24 +37,14 @@ static int write_preview(GameMode mode, const char *directory)
         return 0;
 
     game_init(&game);
-    game.mode = mode;
-    if (mode == GAME_PLAYING || mode == GAME_PAUSED) {
-        game.scroll = 1800.0f;
-        game.progress = 42;
-        game.player_y = 384.0f;
-        game.frame = 180;
-    } else if (mode == GAME_CRASHED) {
-        game.scroll = 330.0f;
-        game.progress = 6;
-        game.mode = GAME_CRASHED;
-    } else if (mode == GAME_COMPLETE) {
-        game.scroll = 5200.0f;
-        game.progress = 100;
-        game.mode = GAME_COMPLETE;
-    }
+    game.mode = preview->mode;
+    game.scroll = preview->scroll;
+    game.player_y = preview->player_y;
+    game.progress = preview->progress;
+    game.frame = preview->frame;
     render_game(framebuffer, WIDTH, HEIGHT, &game);
 
-    snprintf(path, sizeof(path), "%s/%s.ppm", directory, mode_name(mode));
+    snprintf(path, sizeof(path), "%s/%s.ppm", directory, preview->name);
     file = fopen(path, "wb");
     if (!file) {
         free(framebuffer);
@@ -71,10 +67,9 @@ static int write_preview(GameMode mode, const char *directory)
 int main(int argc, char **argv)
 {
     const char *directory = argc > 1 ? argv[1] : ".";
-    const GameMode modes[] = { GAME_TITLE, GAME_PLAYING, GAME_PAUSED, GAME_CRASHED, GAME_COMPLETE };
-    for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
-        if (!write_preview(modes[i], directory)) {
-            fprintf(stderr, "could not write preview for %s\n", mode_name(modes[i]));
+    for (size_t i = 0; i < sizeof(previews) / sizeof(previews[0]); i++) {
+        if (!write_preview(&previews[i], directory)) {
+            fprintf(stderr, "could not write preview: %s\n", previews[i].name);
             return 1;
         }
     }
