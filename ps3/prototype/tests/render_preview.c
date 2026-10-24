@@ -26,7 +26,8 @@ static const Preview previews[] = {
     { "complete", GAME_COMPLETE, 5200.0f, 384.0f, 100, 1000 }
 };
 
-static int write_preview(const Preview *preview, const char *directory)
+static int write_preview(const Preview *preview, const char *directory,
+                         const PrototypeAssets *assets)
 {
     uint32_t *framebuffer = malloc((size_t)WIDTH * HEIGHT * sizeof(*framebuffer));
     GameState game;
@@ -42,7 +43,7 @@ static int write_preview(const Preview *preview, const char *directory)
     game.player_y = preview->player_y;
     game.progress = preview->progress;
     game.frame = preview->frame;
-    render_game(framebuffer, WIDTH, HEIGHT, &game);
+    render_game(framebuffer, WIDTH, HEIGHT, &game, assets);
 
     snprintf(path, sizeof(path), "%s/%s.ppm", directory, preview->name);
     file = fopen(path, "wb");
@@ -67,11 +68,18 @@ static int write_preview(const Preview *preview, const char *directory)
 int main(int argc, char **argv)
 {
     const char *directory = argc > 1 ? argv[1] : ".";
+    PrototypeAssets assets;
+    if (!prototype_assets_load_file(&assets, "ps3/prototype/data/ps3_assets.bin")) {
+        fprintf(stderr, "could not load packed Geometry Dash graphics\n");
+        return 1;
+    }
     for (size_t i = 0; i < sizeof(previews) / sizeof(previews[0]); i++) {
-        if (!write_preview(&previews[i], directory)) {
+        if (!write_preview(&previews[i], directory, &assets)) {
             fprintf(stderr, "could not write preview: %s\n", previews[i].name);
+            prototype_assets_free(&assets);
             return 1;
         }
     }
+    prototype_assets_free(&assets);
     return 0;
 }

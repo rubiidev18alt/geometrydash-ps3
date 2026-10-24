@@ -1,33 +1,41 @@
 # Native PS3 prototype build, gameplay tests, and optional resource staging.
 #
 #   make -f Makefile.ps3              build ps3/prototype/gdps3proto.self
-#   make -f Makefile.ps3 test         host-test gameplay state/input logic
+#   make -f Makefile.ps3 test         host-test gameplay, assets, and renderer
 #   make -f Makefile.ps3 assets       stage the full game's source assets
 #
 # Native builds require the PS3DEV/PSL1GHT toolchain. See README-PS3.md.
 
 HOSTCC ?= cc
 OUT ?= ps3/out/gdps3
+PS3_ASSET_BUNDLE := ps3/prototype/data/ps3_assets.bin
+PS3_ASSET_INPUTS := gfx/icons/player_01_001.png gfx/icons/player_01_2_001.png \
+                    gfx/block001_01_001.png gfx/spike_01_001.png \
+                    gfx/back_and_grounds/bg.png gfx/back_and_grounds/ground.png
 
 .PHONY: all prototype test preview assets clean
 
 all: prototype
 
-prototype:
+$(PS3_ASSET_BUNDLE): $(PS3_ASSET_INPUTS) ps3/prototype/tools/pack_assets.py
+	python3 ps3/prototype/tools/pack_assets.py $@
+
+prototype: $(PS3_ASSET_BUNDLE)
 	$(MAKE) -C ps3/prototype all
 
-test:
+test: $(PS3_ASSET_BUNDLE)
 	@mkdir -p ps3/prototype/build-host
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -Ips3/prototype/source \
-		ps3/prototype/source/game.c ps3/prototype/source/render.c \
-		ps3/prototype/tests/test_game.c -o ps3/prototype/build-host/test_game
+	cd ps3/prototype/build-host && $(HOSTCC) -std=c11 -Wall -Wextra -Werror \
+		-I../source ../source/game.c ../source/gfx_assets.c \
+		../source/render.c ../source/ps3_assets.S ../tests/test_game.c -o test_game
 	./ps3/prototype/build-host/test_game
 
-preview:
+preview: $(PS3_ASSET_BUNDLE)
 	@mkdir -p ps3/prototype/build-host/previews
-	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -Ips3/prototype/source \
-		ps3/prototype/source/game.c ps3/prototype/source/render.c \
-		ps3/prototype/tests/render_preview.c -o ps3/prototype/build-host/render_preview
+	cd ps3/prototype/build-host && $(HOSTCC) -std=c11 -Wall -Wextra -Werror \
+		-I../source ../source/game.c ../source/gfx_assets.c \
+		../source/render.c ../source/ps3_assets.S ../tests/render_preview.c \
+		-o render_preview
 	./ps3/prototype/build-host/render_preview ps3/prototype/build-host/previews
 	@for f in ps3/prototype/build-host/previews/*.ppm; do \
 		python3 ps3/prototype/tests/ppm_to_png.py "$$f" "$${f%.ppm}.png" || exit 1; \
@@ -44,4 +52,4 @@ assets:
 	@echo "PS3 resource staging ready: $(OUT)/romfs"
 
 clean:
-	rm -rf ps3/prototype/build ps3/prototype/build-host ps3/prototype/gdps3proto.elf ps3/prototype/gdps3proto.self ps3/prototype/gdps3proto.fake.self ps3/out
+	rm -rf ps3/prototype/build ps3/prototype/build-host ps3/prototype/data/ps3_assets.bin ps3/prototype/gdps3proto.elf ps3/prototype/gdps3proto.self ps3/prototype/gdps3proto.fake.self ps3/out

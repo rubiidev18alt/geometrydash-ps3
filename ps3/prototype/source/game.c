@@ -15,6 +15,8 @@ static const float spikes[] = {
     3810, 4070, 4110, 4450, 4770, 4810
 };
 
+static const float blocks[] = { 2350, 3250, 4180 };
+
 void game_init(GameState *game)
 {
     game->mode = GAME_TITLE;
@@ -34,11 +36,11 @@ static void begin_run(GameState *game)
 static bool point_in_spike(float x, float y, float left)
 {
     const float base_y = GROUND_Y;
-    const float apex_y = GROUND_Y - 38.0f;
-    const float center_x = left + 19.0f;
+    const float apex_y = GROUND_Y - PLAYER_SIZE;
+    const float center_x = left + PLAYER_SIZE * 0.5f;
     float half_width;
 
-    if (y < apex_y || y > base_y || x < left || x > left + 38.0f)
+    if (y < apex_y || y > base_y || x < left || x > left + PLAYER_SIZE)
         return false;
 
     half_width = (y - apex_y) * 0.5f;
@@ -59,8 +61,16 @@ static bool player_hits_spike(const GameState *game, float spike_x)
         return true;
 
     /* Also catch a spike wholly contained by the cube's bounding rectangle. */
-    return left + 19.0f >= x0 && left + 19.0f <= x1 &&
-           GROUND_Y - 38.0f >= y0 && GROUND_Y - 38.0f <= y1;
+    return left + PLAYER_SIZE * 0.5f >= x0 && left + PLAYER_SIZE * 0.5f <= x1 &&
+           GROUND_Y - PLAYER_SIZE >= y0 && GROUND_Y - PLAYER_SIZE <= y1;
+}
+
+static bool player_hits_block(const GameState *game, float block_x)
+{
+    float player_x = PLAYER_X + game->scroll;
+    float block_y = GROUND_Y - PLAYER_SIZE;
+    return player_x < block_x + PLAYER_SIZE && player_x + PLAYER_SIZE > block_x &&
+           game->player_y < block_y + PLAYER_SIZE && game->player_y + PLAYER_SIZE > block_y;
 }
 
 void game_update(GameState *game, bool jump_pressed, bool pause_pressed, bool restart_pressed)
@@ -106,10 +116,19 @@ void game_update(GameState *game, bool jump_pressed, bool pause_pressed, bool re
     }
 
     for (i = 0; i < sizeof(spikes) / sizeof(spikes[0]); i++) {
-        if (spikes[i] + 38.0f < game->scroll + PLAYER_X ||
+        if (spikes[i] + PLAYER_SIZE < game->scroll + PLAYER_X ||
             spikes[i] > game->scroll + PLAYER_X + PLAYER_SIZE)
             continue;
         if (player_hits_spike(game, spikes[i])) {
+            game->mode = GAME_CRASHED;
+            return;
+        }
+    }
+    for (i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++) {
+        if (blocks[i] > game->scroll + PLAYER_X + PLAYER_SIZE ||
+            blocks[i] + PLAYER_SIZE < game->scroll + PLAYER_X)
+            continue;
+        if (player_hits_block(game, blocks[i])) {
             game->mode = GAME_CRASHED;
             return;
         }

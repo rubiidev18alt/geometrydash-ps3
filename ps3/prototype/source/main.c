@@ -39,6 +39,7 @@ int main(int argc, const char *argv[])
 {
     void *host_memory;
     GameState game;
+    PrototypeAssets assets;
     padInfo pad_info;
     padData pad_data;
     int old_cross = 0;
@@ -61,6 +62,10 @@ int main(int argc, const char *argv[])
     if (!rsx_video_init(host_memory, RSX_HOST_SIZE) ||
         !rsx_context || !rsx_framebuffer[0] || !rsx_framebuffer[1])
         return 1;
+    if (!prototype_assets_load_embedded(&assets)) {
+        printf("PS3 prototype: embedded graphics are missing or invalid\n");
+        return 1;
+    }
 
     ioPadInit(7);
     sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, sysutil_callback, NULL);
@@ -105,7 +110,7 @@ int main(int argc, const char *argv[])
         old_start = connected ? start : 0;
         old_circle = connected ? circle : 0;
 
-        render_game(rsx_framebuffer[rsx_current_fb], rsx_width, rsx_height, &game);
+        render_game(rsx_framebuffer[rsx_current_fb], rsx_width, rsx_height, &game, &assets);
         rsx_video_flip();
     }
 
