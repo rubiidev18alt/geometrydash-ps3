@@ -91,6 +91,15 @@ fabric.properties
 .clangd
 compile_commands.json
 
+# ---- PS3 port ----
+ps3/out/
+ps3/prototype/build/
+ps3/prototype/build-host/
+ps3/prototype/gdps3proto.elf
+ps3/prototype/gdps3proto.self
+ps3/prototype/gdps3proto.fake.self
+ps3/prototype/*.pkg
+
 # ---- PSP port ----
 # build output (make -f Makefile.psp package)
 psp/build/
