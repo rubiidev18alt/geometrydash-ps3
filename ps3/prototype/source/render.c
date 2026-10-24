@@ -8,17 +8,20 @@
 #define GROUND_Y  432
 #define PLAYER_X  172
 #define PLAYER_SZ 48
-#define LEVEL_END 5200.0f
-
 #define COLOR_BG       0x00101a36u
 #define COLOR_GRID     0x001c2b4eu
-#define COLOR_GROUND   0x00212e4bu
 #define COLOR_GROUND2  0x0038496cu
 #define COLOR_CYAN     0x0048f0e5u
 #define COLOR_WHITE    0x00f5fbffu
 #define COLOR_PINK     0x00ff527du
 #define COLOR_YELLOW   0x00ffe86bu
 #define COLOR_PANEL    0x0015213bu
+#define CUBE_P1_R 0
+#define CUBE_P1_G 255
+#define CUBE_P1_B 0
+#define CUBE_P2_R 0
+#define CUBE_P2_G 255
+#define CUBE_P2_B 255
 
 /* Five-bit rows, readable at small sizes and independent of external assets. */
 static const unsigned char font[36][7] = {
@@ -80,6 +83,68 @@ static void fill_rect(uint32_t *fb, unsigned width, unsigned height,
     }
 }
 
+static void draw_texture(uint32_t *fb, unsigned width, unsigned height,
+                         const GfxTexture *texture, int x, int y, int w, int h,
+                         uint8_t tint_r, uint8_t tint_g, uint8_t tint_b,
+                         bool colorize_black)
+{
+    int raw_x0, raw_x1, raw_y0, raw_y1;
+    int x0, x1, y0, y1;
+    int mapped_w, mapped_h;
+
+    if (!texture || !texture->rgba || !texture->width || !texture->height || w <= 0 || h <= 0)
+        return;
+
+    raw_x0 = x * (int)width / VIRTUAL_W;
+    raw_x1 = (x + w) * (int)width / VIRTUAL_W;
+    raw_y0 = y * (int)height / VIRTUAL_H;
+    raw_y1 = (y + h) * (int)height / VIRTUAL_H;
+    mapped_w = raw_x1 - raw_x0;
+    mapped_h = raw_y1 - raw_y0;
+    if (mapped_w <= 0 || mapped_h <= 0)
+        return;
+
+    x0 = raw_x0 < 0 ? 0 : raw_x0;
+    y0 = raw_y0 < 0 ? 0 : raw_y0;
+    x1 = raw_x1 > (int)width ? (int)width : raw_x1;
+    y1 = raw_y1 > (int)height ? (int)height : raw_y1;
+    if (x0 >= x1 || y0 >= y1)
+        return;
+
+    for (int py = y0; py < y1; py++) {
+        unsigned ty = (unsigned)(((py - raw_y0) * texture->height) / mapped_h);
+        const uint8_t *src = texture->rgba + (size_t)ty * texture->width * 4;
+        uint32_t *dst = fb + (size_t)py * width + x0;
+        for (int px = x0; px < x1; px++, dst++) {
+            unsigned tx = (unsigned)(((px - raw_x0) * texture->width) / mapped_w);
+            const uint8_t *rgba = src + tx * 4;
+            unsigned alpha = rgba[3];
+            unsigned sr, sg, sb, dr, dg, db;
+            if (!alpha)
+                continue;
+            if (colorize_black && rgba[0] == 0 && rgba[1] == 0 && rgba[2] == 0) {
+                sr = tint_r;
+                sg = tint_g;
+                sb = tint_b;
+            } else {
+                sr = (rgba[0] * tint_r + 127) / 255;
+                sg = (rgba[1] * tint_g + 127) / 255;
+                sb = (rgba[2] * tint_b + 127) / 255;
+            }
+            if (alpha == 255) {
+                *dst = (sr << 16) | (sg << 8) | sb;
+            } else {
+                dr = (*dst >> 16) & 255;
+                dg = (*dst >> 8) & 255;
+                db = *dst & 255;
+                *dst = (((sr * alpha + dr * (255 - alpha) + 127) / 255) << 16) |
+                       (((sg * alpha + dg * (255 - alpha) + 127) / 255) << 8) |
+                       ((sb * alpha + db * (255 - alpha) + 127) / 255);
+            }
+        }
+    }
+}
+
 static int glyph_index(char c)
 {
     if (c >= 'A' && c <= 'Z') return c - 'A';
@@ -133,55 +198,77 @@ static void centered_text(uint32_t *fb, unsigned width, unsigned height,
     draw_text(fb, width, height, x, y, text, scale, color);
 }
 
-static void draw_spike(uint32_t *fb, unsigned width, unsigned height, int x)
+static void draw_spike(uint32_t *fb, unsigned width, unsigned height,
+                       const PrototypeAssets *assets, int x)
 {
-    const int top = GROUND_Y - 38;
-    for (int row = 0; row < 38; row++) {
-        int half = row / 2;
-        fill_rect(fb, width, height, x + 19 - half, top + row, half * 2 + 1, 1, COLOR_PINK);
-    }
+    if (assets)
+        draw_texture(fb, width, height, &assets->spike, x, GROUND_Y - PLAYER_SZ,
+                     PLAYER_SZ, PLAYER_SZ, 255, 82, 125, false);
 }
 
-static void draw_player(uint32_t *fb, unsigned width, unsigned height, int y, unsigned frame)
+static void draw_block(uint32_t *fb, unsigned width, unsigned height,
+                       const PrototypeAssets *assets, int x)
 {
-    /* A simple bright cube, with a one-pixel color split to suggest rotation. */
-    fill_rect(fb, width, height, PLAYER_X, y, PLAYER_SZ, PLAYER_SZ, COLOR_CYAN);
-    fill_rect(fb, width, height, PLAYER_X + 5, y + 5, PLAYER_SZ - 10, PLAYER_SZ - 10, COLOR_WHITE);
-    fill_rect(fb, width, height, PLAYER_X + 10, y + 10, PLAYER_SZ - 20, PLAYER_SZ - 20,
-              (frame / 8) % 2 ? COLOR_CYAN : COLOR_YELLOW);
-    fill_rect(fb, width, height, PLAYER_X + 14, y + 14, 6, 6, COLOR_PANEL);
-    fill_rect(fb, width, height, PLAYER_X + 28, y + 14, 6, 6, COLOR_PANEL);
+    if (assets)
+        draw_texture(fb, width, height, &assets->block, x, GROUND_Y - PLAYER_SZ,
+                     PLAYER_SZ, PLAYER_SZ, 90, 165, 255, true);
 }
 
-static void draw_scene(uint32_t *fb, unsigned width, unsigned height, const GameState *game)
+static void draw_player(uint32_t *fb, unsigned width, unsigned height,
+                        const PrototypeAssets *assets, int y)
+{
+    if (!assets)
+        return;
+    /* Geometry Dash icon 1: secondary layer first, then default P1/P2 tints. */
+    draw_texture(fb, width, height, &assets->cube_secondary,
+                 PLAYER_X + 18, y + 18, 12, 12, CUBE_P2_R, CUBE_P2_G, CUBE_P2_B, false);
+    draw_texture(fb, width, height, &assets->cube_primary, PLAYER_X, y,
+                 PLAYER_SZ, PLAYER_SZ, CUBE_P1_R, CUBE_P1_G, CUBE_P1_B, false);
+}
+
+static void draw_scene(uint32_t *fb, unsigned width, unsigned height,
+                       const GameState *game, const PrototypeAssets *assets)
 {
     int offset = (int)game->scroll;
     const int spikes[] = {
         530,790,1060,1098,1390,1690,1730,1770,2110,2410,2630,2670,2710,
         3090,3430,3470,3810,4070,4110,4450,4770,4810
     };
+    const int blocks[] = { 2350, 3250, 4180 };
 
-    /* Solid, fast-to-draw backdrop plus parallax bars and a lightweight grid. */
     for (size_t i = 0, n = (size_t)width * height; i < n; i++)
         fb[i] = COLOR_BG;
-    for (int y = 54; y < GROUND_Y; y += 54)
-        fill_rect(fb, width, height, 0, y, VIRTUAL_W, 1, COLOR_GRID);
-    for (int i = 0; i < 12; i++) {
-        int x = (i * 113 - (offset / 3) % 113 + VIRTUAL_W) % VIRTUAL_W;
-        fill_rect(fb, width, height, x, 75 + (i % 4) * 54, 5, 5, COLOR_GRID);
+
+    if (assets && assets->background.rgba) {
+        const int tile = 540;
+        int bg_offset = (offset / 8) % tile;
+        for (int x = -tile - bg_offset; x < VIRTUAL_W; x += tile)
+            draw_texture(fb, width, height, &assets->background, x, 0, tile, tile,
+                         0, 5, 100, false);
     }
 
-    fill_rect(fb, width, height, 0, GROUND_Y, VIRTUAL_W, VIRTUAL_H - GROUND_Y, COLOR_GROUND);
-    fill_rect(fb, width, height, 0, GROUND_Y, VIRTUAL_W, 5, COLOR_CYAN);
-    for (int x = -(offset % 64); x < VIRTUAL_W; x += 64)
-        fill_rect(fb, width, height, x, GROUND_Y + 30, 2, VIRTUAL_H - GROUND_Y - 30, COLOR_GROUND2);
+    if (assets && assets->ground.rgba) {
+        int ground_offset = offset % 96;
+        for (int x = -96 - ground_offset; x < VIRTUAL_W; x += 96)
+            draw_texture(fb, width, height, &assets->ground, x, GROUND_Y, 96,
+                         VIRTUAL_H - GROUND_Y, 40, 125, 255, false);
+    } else {
+        fill_rect(fb, width, height, 0, GROUND_Y, VIRTUAL_W,
+                  VIRTUAL_H - GROUND_Y, 0x00212e4bu);
+    }
+    fill_rect(fb, width, height, 0, GROUND_Y, VIRTUAL_W, 4, COLOR_CYAN);
 
+    for (unsigned i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++) {
+        int x = blocks[i] - offset;
+        if (x > -PLAYER_SZ && x < VIRTUAL_W)
+            draw_block(fb, width, height, assets, x);
+    }
     for (unsigned i = 0; i < sizeof(spikes) / sizeof(spikes[0]); i++) {
         int x = spikes[i] - offset;
-        if (x > -40 && x < VIRTUAL_W + 40)
-            draw_spike(fb, width, height, x);
+        if (x > -PLAYER_SZ && x < VIRTUAL_W)
+            draw_spike(fb, width, height, assets, x);
     }
-    draw_player(fb, width, height, (int)game->player_y, game->frame);
+    draw_player(fb, width, height, assets, (int)game->player_y);
 }
 
 static void draw_hud(uint32_t *fb, unsigned width, unsigned height, const GameState *game)
@@ -195,12 +282,12 @@ static void draw_hud(uint32_t *fb, unsigned width, unsigned height, const GameSt
 }
 
 void render_game(uint32_t *framebuffer, unsigned width, unsigned height,
-                 const GameState *game)
+                 const GameState *game, const PrototypeAssets *assets)
 {
     if (!framebuffer || !game || width == 0 || height == 0)
         return;
 
-    draw_scene(framebuffer, width, height, game);
+    draw_scene(framebuffer, width, height, game, assets);
     draw_hud(framebuffer, width, height, game);
 
     switch (game->mode) {

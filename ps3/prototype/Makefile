@@ -18,6 +18,12 @@ CFLAGS      = -O2 -Wall -Wextra -std=gnu11 -mcpu=cell $(MACHDEP) $(INCLUDE)
 LDFLAGS     = $(MACHDEP) -Wl,-Map,$(notdir $@).map
 LIBS        := -lrsx -lgcm_sys -lio -lsysutil -lrt -llv2 -lm
 LIBDIRS     :=
+ASSET_BUNDLE := data/ps3_assets.bin
+ASSET_INPUTS := ../../gfx/icons/player_01_001.png \
+                ../../gfx/icons/player_01_2_001.png \
+                ../../gfx/block001_01_001.png ../../gfx/spike_01_001.png \
+                ../../gfx/back_and_grounds/bg.png \
+                ../../gfx/back_and_grounds/ground.png
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT  := $(CURDIR)/$(TARGET)
@@ -26,7 +32,8 @@ export DEPSDIR := $(CURDIR)/$(BUILD)
 export BUILDDIR:= $(CURDIR)/$(BUILD)
 
 CFILES := $(notdir $(wildcard $(SOURCES)/*.c))
-OFILES := $(CFILES:.c=.o)
+SFILES := $(notdir $(wildcard $(SOURCES)/*.S))
+OFILES := $(CFILES:.c=.o) $(SFILES:.S=.o)
 
 export LD := $(CC)
 export OFILES
@@ -35,11 +42,15 @@ export LIBPATHS := $(LIBPSL1GHT_LIB)
 
 .PHONY: all clean $(BUILD)
 
-$(BUILD):
+$(ASSET_BUNDLE): $(ASSET_INPUTS) tools/pack_assets.py
+	@mkdir -p data
+	python3 tools/pack_assets.py $@
+
+$(BUILD): $(ASSET_BUNDLE)
 	@mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
-all: $(BUILD)
+all: $(ASSET_BUNDLE) $(BUILD)
 
 clean:
 	@rm -rf $(BUILD) $(OUTPUT).elf $(OUTPUT).self $(OUTPUT).fake.self
@@ -47,5 +58,6 @@ else
 DEPENDS := $(OFILES:.o=.d)
 $(OUTPUT).self: $(OUTPUT).elf
 $(OUTPUT).elf: $(OFILES)
+ps3_assets.o: ../data/ps3_assets.bin
 -include $(DEPENDS)
 endif
