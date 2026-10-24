@@ -35,6 +35,18 @@ installed here, so the native executable has not yet been built or emulator
 verified. `make -f Makefile.ps3 preview` produces PNGs from the same software
 renderer on the host for visual review; those are **not emulator captures**.
 
+## Preview screenshots
+
+These are host-rendered prototype previews, not RPCS3 captures:
+
+- [Gameplay — approach](docs/images/ps3-prototype/gameplay_approach.png)
+- [Gameplay — mid-jump](docs/images/ps3-prototype/gameplay_jump.png)
+- [Gameplay — later run](docs/images/ps3-prototype/gameplay_run.png)
+- [Title screen](docs/images/ps3-prototype/title.png)
+- [Paused](docs/images/ps3-prototype/paused.png)
+- [Crashed](docs/images/ps3-prototype/crashed.png)
+- [Complete](docs/images/ps3-prototype/complete.png)
+
 ## Prototype controls
 
 | Controller input | Action |
