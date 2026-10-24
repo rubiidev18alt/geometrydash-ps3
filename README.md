@@ -90,7 +90,7 @@ make -f Makefile.psp package                       # psp/out/gdpsp/: EBOOT.PBP +
 make -f Makefile.psp deploy DEPLOY=/path/to/folder  # copy it to a folder (a Memory Stick, PPSSPP...)
 ```
 
-[README-PSP.md](README-PSP.md) explains how the port is organized. The original 3DS README is in [README-3DS.md](README-3DS.md).
+[README-PSP.md](README-PSP.md) explains how the PSP port is organized. A small native PS3 gameplay prototype is in progress; see [README-PS3.md](README-PS3.md) for build steps and controls. The original 3DS README is in [README-3DS.md](README-3DS.md).
 
 ### FUTURE UPDATES
 From now on, there won't be any update releases for a long while. I intend to keep the map packs updated, but the game itself is finally stable, pushing the limits of the PSP.
